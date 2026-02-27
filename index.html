@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>抛硬币小游戏</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.10);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.65);
+      --accent: rgba(255,255,255,.18);
+      --shadow: rgba(0,0,0,.55);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 700px at 50% 20%, #19223a 0%, var(--bg) 55%, #070a10 100%);
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none; /* allow pointer drag */
+    }
+
+    .wrap {
+      position: relative;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .hud {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .card {
+      pointer-events: auto;
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 12px 14px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      min-width: 260px;
+    }
+
+    .title {
+      font-size: 14px;
+      font-weight: 650;
+      letter-spacing: .2px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .title .dot {
+      width: 8px; height: 8px; border-radius: 999px;
+      background: rgba(255,255,255,.65);
+      box-shadow: 0 0 0 3px rgba(255,255,255,.10);
+    }
+    .sub { color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+    .btnrow {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      pointer-events: auto;
+    }
+    button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-weight: 650;
+      letter-spacing: .2px;
+      cursor: pointer;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease;
+    }
+    button:hover { background: rgba(255,255,255,.11); }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button.primary {
+      border-color: rgba(255,255,255,.22);
+      background: rgba(255,255,255,.12);
+    }
+
+    .stage {
+      position: relative;
+      width: min(520px, 92vw);
+      height: min(640px, 82vh);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: 0 30px 80px rgba(0,0,0,.35);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    .hint {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      right: 14px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.24);
+      border: 1px solid rgba(255,255,255,.10);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    /* Coin 3D */
+    .coinWrap {
+      position: absolute;
+      left: 50%;
+      bottom: 92px;
+      transform: translateX(-50%);
+      width: 170px;
+      height: 170px;
+      perspective: 900px;
+      pointer-events: auto;
+    }
+
+    .shadow {
+      position: absolute;
+      left: 50%;
+      bottom: 78px;
+      width: 150px;
+      height: 26px;
+      transform: translateX(-50%);
+      filter: blur(2px);
+      background: radial-gradient(closest-side, rgba(0,0,0,.55), rgba(0,0,0,0));
+      opacity: .55;
+      pointer-events: none;
+    }
+
+    .coin {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      border-radius: 50%;
+      cursor: grab;
+      touch-action: none;
+      will-change: transform;
+    }
+    .coin:active { cursor: grabbing; }
+
+    .face {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 34px;
+      letter-spacing: .8px;
+      color: rgba(0,0,0,.78);
+      backface-visibility: hidden;
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+
+    .heads {
+      background:
+        radial-gradient(120px 120px at 35% 30%, rgba(255,255,255,.90), rgba(255,255,255,0) 60%),
+        radial-gradient(180px 180px at 50% 70%, rgba(255,255,255,.25), rgba(255,255,255,0) 60%),
+        linear-gradient(145deg, #f6d98b 0%, #d8a93f 40%, #f0d07a 70%, #b8841d 100%);
+    }
+
+    .tails {
+      transform: rotateX(180deg) translateZ(1px);
+      background:
+        radial-gradient(120px 120px at 35% 30%, rgba(255,255,255,.90), rgba(255,255,255,0) 60%),
+        radial-gradient(180px 180px at 50% 70%, rgba(255,255,255,.25), rgba(255,255,255,0) 60%),
+        linear-gradient(145deg, #e8eef6 0%, #b9c5d4 40%, #dfe7f2 70%, #8d98a8 100%);
+    }
+
+    .rim {
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,0,0,.18);
+      box-shadow: inset 0 0 0 3px rgba(255,255,255,.18);
+      pointer-events: none;
+    }
+
+    .result {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(0,0,0,.22);
+      border: 1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(10px);
+    }
+    .result .big {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: .3px;
+    }
+    .result .small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.12);
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .footerNote {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      padding: 10px 12px;
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      max-width: 420px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="card">
+        <div class="title"><span class="dot"></span>抛硬币小游戏</div>
+        <div class="sub">
+          用手势“甩出”硬币：初始速度和自旋来自你的拖拽/释放。<br/>
+          模拟里加入极小微扰（<code>crypto.getRandomValues</code>）以增强不可预测性。
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <input id="batchN" type="number" min="1" max="200000" value="1000"
+               style="width:110px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);
+                      background:rgba(255,255,255,.06);color:rgba(255,255,255,.92);outline:none;">
+        <button id="btnBatch">批量跑 N 次</button>
+        <button id="btnToss" class="primary">一键抛掷（Space）</button>
+        <button id="btnReset">重置</button>
+        <button id="btnClear">清零</button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="result">
+        <div>
+          <div class="big" id="resultText">拖拽硬币向上甩，或按 Space</div>
+          <div class="small" id="resultSub">统计：正面 <b id="hCount">0</b> ｜反面 <b id="tCount">0</b> ｜立 <b id="eCount">0</b><span id="statExtra"></span></div>
+        </div>
+        <div class="pill" id="statePill">待机</div>
+      </div>
+
+      <div class="footerNote">
+        小提示：甩得越快/越带横向，翻得越多。<br/>
+        （这不是直接随机选结果，而是“落定时朝向”的输出。）
+      </div>
+
+      <div class="shadow" id="shadow"></div>
+
+      <div class="coinWrap" id="coinWrap">
+        <div class="coin" id="coin">
+          <div class="face heads">
+            正
+            <div class="rim"></div>
+          </div>
+          <div class="face tails">
+            反
+            <div class="rim"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint">
+        操作：按住硬币拖拽并快速松手（建议向上甩）。<br/>
+        也可点击“一键抛掷”或按 Space。移动端同样支持触控甩动。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const coin = document.getElementById("coin");
+      const coinWrap = document.getElementById("coinWrap");
+      const stage = document.getElementById("stage");
+      const shadow = document.getElementById("shadow");
+
+      const btnToss = document.getElementById("btnToss");
+      const btnReset = document.getElementById("btnReset");
+      const btnClear = document.getElementById("btnClear");
+      const btnBatch = document.getElementById("btnBatch");
+      const batchN = document.getElementById("batchN");
+
+      const resultText = document.getElementById("resultText");
+      const statePill  = document.getElementById("statePill");
+      const hCountEl   = document.getElementById("hCount");
+      const tCountEl   = document.getElementById("tCount");
+      const eCountEl   = document.getElementById("eCount");
+      const statExtraEl = document.getElementById("statExtra");
+
+      // ---------- helpers ----------
+      const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+      const lerp  = (a, b, t) => a + (b - a) * t;
+
+      function csprngU32() {
+        const u = new Uint32Array(1);
+        if (globalThis.crypto?.getRandomValues) {
+          crypto.getRandomValues(u);
+          return u[0] >>> 0;
+        }
+        // fallback: time jitter (not cryptographically strong)
+        let x = (Date.now() ^ ((performance.now() * 1000) | 0)) >>> 0;
+        x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+        return x >>> 0;
+      }
+
+      // SplitMix32-style mixing: good diffusion for seeds
+      function mix32(x) {
+        x >>>= 0;
+        x ^= x >>> 16;
+        x = Math.imul(x, 0x7feb352d) >>> 0;
+        x ^= x >>> 15;
+        x = Math.imul(x, 0x846ca68b) >>> 0;
+        x ^= x >>> 16;
+        return x >>> 0;
+      }
+
+      // Fast PRNG seeded from crypto once per toss (good enough for games; avoids per-frame crypto calls)
+      function makeRng(seedU32) {
+        let x = (seedU32 >>> 0) || 0x12345678;
+        return {
+          u() { // [0,1)
+            x ^= (x << 13) >>> 0;
+            x ^= (x >>> 17) >>> 0;
+            x ^= (x << 5) >>> 0;
+            return (x >>> 0) / 4294967296;
+          },
+          s() { // [-1,1)
+            return this.u() * 2 - 1;
+          }
+        };
+      }
+
+      function rngFromSeed(seedU32) {
+        return makeRng(mix32(seedU32 >>> 0));
+      }
+
+      function clearStatExtra() {
+        statExtraEl.textContent = "";
+      }
+
+      function setPill(text) {
+        statePill.textContent = text;
+      }
+
+      // ---------- game state ----------
+      let running = false;
+      let dragging = false;
+      let settled = true;
+      let batching = false;
+
+      // physics-ish state (vertical + rotation around X)
+      // y: height above floor (px), y=0 on floor; vy is upward-positive (px/s)
+      let y = 0;
+      let vy = 0;
+
+      // angle in radians; heads if cos(angle)>0
+      let angle = 0;
+      let av = 0; // angular velocity rad/s
+
+      let baseBottom = 92; // px (kept for layout parity; not used directly)
+      let coinX = 0; // horizontal offset (px)
+      let vx = 0;    // horizontal velocity (px/s)
+
+      // counts
+      let headsCount = 0;
+      let tailsCount = 0;
+      let edgeCount  = 0;
+
+      // easter egg: rare "standing" (edge) landing
+      let standing = false;
+      const STAND_PROB = 1 / 8000;   // 极小概率（约 0.0125%）
+      const STAND_COS_TH = 0.045;    // |cos(angle)| 越接近 0 越像“侧立”
+
+      // drag sampling (stage coords)
+      let lastPX = 0, lastPY = 0, lastPT = 0;
+      let vEstX = 0, vEstY = 0; // px/ms
+
+      // ---------- base simulation params ----------
+      const g = 2400;                 // px/s^2
+      const AIR_BASE = 0.10;          // linear damping on vy
+      const BOUNCE_BASE = 0.52;       // restitution
+      const FLOOR_FRICTION_BASE = 0.78;
+      const SPIN_FRICTION_BASE  = 0.76;
+      const SPIN_AIR_BASE = 0.085;    // spin damping per second-ish
+
+      // stop thresholds
+      const VY_STOP = 26;
+      const AV_STOP = 1.4;
+      let calmFrames = 0;
+
+      // per-toss randomness (seeded once, then used as small "imperfections")
+      let tossSeed = 0;
+      let tossRng = null;
+      let pAir = AIR_BASE;
+      let pBounce = BOUNCE_BASE;
+      let pFloorFriction = FLOOR_FRICTION_BASE;
+      let pSpinFriction  = SPIN_FRICTION_BASE;
+      let pSpinAir       = SPIN_AIR_BASE;
+      let pKick          = 0.10;
+      let pTorqueNoise   = 0.28;
+      let pVxNoise       = 16;
+
+      function sampleTossParams(rng) {
+        // Keep perturbations small so it still "feels" physical but becomes chaotic/unpredictable.
+        pAir = AIR_BASE * (1 + rng.s() * 0.22);
+        pBounce = clamp(BOUNCE_BASE + rng.s() * 0.06, 0.35, 0.75);
+        pFloorFriction = clamp(FLOOR_FRICTION_BASE + rng.s() * 0.06, 0.55, 0.95);
+        pSpinFriction  = clamp(SPIN_FRICTION_BASE  + rng.s() * 0.06, 0.55, 0.95);
+        pSpinAir       = clamp(SPIN_AIR_BASE * (1 + rng.s() * 0.25), 0.03, 0.18);
+
+        // collision "kick" and continuous tiny torque noise
+        pKick        = 0.10 * (1 + rng.s() * 0.55);
+        pTorqueNoise = 0.28 * (1 + rng.s() * 0.70);
+        pVxNoise     = 16 * (1 + rng.s() * 0.80);
+      }
+
+      function render() {
+        const ty = -y;
+        const sc = 1 + clamp(y / 1000, 0, 0.12);
+        const rz = clamp(vx / 900, -10, 10);
+
+        coinWrap.style.transform = `translateX(-50%) translateX(${coinX}px) translateY(${ty}px) scale(${sc})`;
+
+        if (standing) {
+          // "edge" view: visually compress into a thin ellipse and keep it upright
+          // (no full 3D cylinder, but reads as "standing" well enough)
+          const wobble = 0.0;
+          coin.style.transform = `rotateZ(${rz + wobble}deg) scaleX(0.12) scaleY(1.03)`;
+        } else {
+          const rx = angle * 180 / Math.PI;
+          coin.style.transform = `rotateX(${rx}deg) rotateZ(${rz}deg)`;
+        }
+
+        const shScale = clamp(1 - y / 520, 0.25, 1);
+        const shOp = clamp(0.62 - y / 900, 0.10, 0.62);
+        shadow.style.transform = `translateX(-50%) scale(${shScale})`;
+        shadow.style.opacity = `${shOp}`;
+      }
+
+      function decideFaceFromAngle(a) {
+        return (Math.cos(a) > 0) ? "heads" : "tails";
+      }
+
+      function shouldStand(a, rng) {
+        // 1) 必须接近“侧着”（cos≈0），否则不触发
+        const c = Math.abs(Math.cos(a));
+        if (c > STAND_COS_TH) return false;
+
+        // 2) 概率随“更接近侧立”略微上升（更自然）
+        const closeness = 1 - (c / STAND_COS_TH); // 0..1
+        const p = STAND_PROB * (0.25 + 0.75 * closeness);
+        return rng.u() < p;
+      }
+
+      function settleToFace(face) {
+        const twopi = Math.PI * 2;
+        let target = 0;
+
+        if (face === "heads") {
+          const k = Math.round(angle / twopi);
+          target = k * twopi;
+        } else {
+          const k = Math.round((angle - Math.PI) / twopi);
+          target = Math.PI + k * twopi;
+        }
+
+        const start = angle;
+        const dur = 220;
+        const t0 = performance.now();
+
+        function step(t) {
+          const u = clamp((t - t0) / dur, 0, 1);
+          const e = 1 - Math.pow(1 - u, 3);
+          angle = lerp(start, target, e);
+          render();
+          if (u < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
+      function showResult(face) {
+        if (face === "heads") {
+          headsCount++;
+          resultText.textContent = "结果：正面";
+        } else if (face === "tails") {
+          tailsCount++;
+          resultText.textContent = "结果：反面";
+        } else {
+          edgeCount++;
+          resultText.textContent = "彩蛋：硬币站住了（立）";
+        }
+        hCountEl.textContent = String(headsCount);
+        tCountEl.textContent = String(tailsCount);
+        eCountEl.textContent = String(edgeCount);
+        clearStatExtra();
+      }
+
+      function startSim({ initVy, initVx, initAv, initAngle, seed }) {
+        if (running || batching) return;
+
+        running = true;
+        settled = false;
+        calmFrames = 0;
+        standing = false;
+
+        tossSeed = (seed >>> 0) || csprngU32();
+        tossRng = rngFromSeed(tossSeed);
+        sampleTossParams(tossRng);
+
+        // "micro-perturbation": tiny randomness injected into initial conditions (chaos amplifier)
+        const epsAngle = tossRng.s() * 0.006; // rad
+        const epsVy    = tossRng.s() * 0.45;  // px/s
+        const epsVx    = tossRng.s() * 1.8;   // px/s
+        const epsAv    = tossRng.s() * 0.9;   // rad/s
+
+        y = 0;
+        vy = initVy + epsVy;
+        vx = initVx + epsVx;
+
+        const a0 = (typeof initAngle === "number") ? initAngle : (tossRng.u() * Math.PI * 2);
+        angle = a0 + epsAngle;
+
+        // small multiplicative jitter + additive jitter
+        av = initAv * (1 + tossRng.s() * 0.010) + epsAv;
+
+        coinX = clamp(coinX, -180, 180);
+
+        clearStatExtra();
+        setPill("飞行中");
+
+        let lastT = performance.now();
+        requestAnimationFrame(function loop(t) {
+          const dt = clamp((t - lastT) / 1000, 0.001, 0.024);
+          lastT = t;
+
+          // gravity
+          vy -= g * dt;
+          y  += vy * dt;
+
+          // air / damping
+          vy *= (1 - pAir * dt);
+          vx *= (1 - 0.55 * dt);
+          av *= (1 - pSpinAir * dt);
+
+          // tiny continuous imperfections (avoid per-frame crypto; use tossRng stream)
+          // make it slightly stronger while in-air to enhance chaos
+          const airFactor = clamp(y / 180, 0, 1);
+          vx += tossRng.s() * pVxNoise * airFactor * dt;
+          av += tossRng.s() * pTorqueNoise * (0.35 + 0.65 * airFactor) * dt;
+
+          // integrate rotation
+          angle += av * dt;
+
+          // floor collision
+          if (y < 0) {
+            y = 0;
+            if (vy < 0) {
+              vy = -vy * pBounce;
+              vx *= pFloorFriction;
+              av *= pSpinFriction;
+
+              // collision imperfection "kick"
+              av += tossRng.s() * pKick;
+            }
+          }
+
+          // settle check
+          const low = (Math.abs(vy) < VY_STOP && Math.abs(av) < AV_STOP && y === 0);
+          calmFrames = low ? (calmFrames + 1) : 0;
+
+          if (calmFrames > 18) {
+            running = false;
+            settled = true;
+
+            // rare easter egg: standing on edge
+            if (shouldStand(angle, tossRng)) {
+              standing = true;
+              setPill("站立");
+              render();
+              showResult("edge");
+              return;
+            }
+
+            setPill("已落定");
+            const face = decideFaceFromAngle(angle);
+            settleToFace(face);
+            showResult(face);
+            return;
+          }
+
+          if (y > 240) setPill("高速翻转");
+          else if (y > 30) setPill("下落中");
+          else setPill("弹跳/减速");
+
+          render();
+          requestAnimationFrame(loop);
+        });
+      }
+
+      // ---------- auto toss ----------
+      function sampleAutoInitial(rng) {
+        const initVy = 1650 + rng.s() * 160;
+        const initVx = rng.s() * 420;
+
+        // make spin direction correlate with lateral motion (a bit more "physical")
+        const sign = (initVx >= 0) ? 1 : -1;
+        const initAv = (34 + Math.abs(rng.s()) * 5) * sign;
+
+        const initAngle = rng.u() * Math.PI * 2;
+        return { initVy, initVx, initAv, initAngle };
+      }
+
+      function tossAuto() {
+        if (running || dragging || batching) return;
+
+        const seed = csprngU32();
+        const rng = rngFromSeed(seed ^ 0xA11CE5ED);
+        const init = sampleAutoInitial(rng);
+
+        startSim({ ...init, seed });
+      }
+
+      // ---------- reset ----------
+      function reset() {
+        running = false;
+        dragging = false;
+        settled = true;
+        standing = false;
+
+        batching = false;
+        btnBatch.disabled = false;
+        btnToss.disabled = false;
+
+        y = 0; vy = 0;
+        angle = 0; av = 0;
+        coinX = 0; vx = 0;
+
+        resultText.textContent = "拖拽硬币向上甩，或按 Space";
+        clearStatExtra();
+        setPill("待机");
+        render();
+      }
+
+      function clearCounts() {
+        if (running || dragging || batching) return;
+        headsCount = 0;
+        tailsCount = 0;
+        edgeCount  = 0;
+        hCountEl.textContent = "0";
+        tCountEl.textContent = "0";
+        eCountEl.textContent = "0";
+        clearStatExtra();
+        resultText.textContent = "统计已清零（不影响当前位置/姿态）";
+        setPill("待机");
+      }
+
+      // ---------- batch simulation (no animation) ----------
+      // erf 近似（Abramowitz & Stegun 7.1.26），用于计算正态分布CDF → p-value
+      function erf(x) {
+        const sign = x < 0 ? -1 : 1;
+        x = Math.abs(x);
+        const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741,
+              a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+        const t = 1 / (1 + p * x);
+        const y = 1 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t * Math.exp(-x*x);
+        return sign * y;
+      }
+      function phi(x) {
+        return 0.5 * (1 + erf(x / Math.SQRT2));
+      }
+      function twoSidedPFromZ(z) {
+        const az = Math.abs(z);
+        return 2 * (1 - phi(az));
+      }
+
+      function simulateOnceSeed(seed) {
+        const rng = rngFromSeed(seed);
+        // initial distribution = same as auto toss
+        const init = sampleAutoInitial(rng);
+
+        // toss params + micro-perturbations
+        sampleTossParams(rng);
+
+        const epsAngle = rng.s() * 0.006;
+        const epsVy    = rng.s() * 0.45;
+        const epsVx    = rng.s() * 1.8;
+        const epsAv    = rng.s() * 0.9;
+
+        let y0 = 0;
+        let vy0 = init.initVy + epsVy;
+        let vx0 = init.initVx + epsVx;
+        let a0  = init.initAngle + epsAngle;
+        let av0 = init.initAv * (1 + rng.s() * 0.010) + epsAv;
+
+        const dt = 1 / 240;
+        const MAX_STEPS = 240 * 8;
+        let calm = 0;
+
+        for (let i = 0; i < MAX_STEPS; i++) {
+          vy0 -= g * dt;
+          y0  += vy0 * dt;
+
+          vy0 *= (1 - pAir * dt);
+          vx0 *= (1 - 0.55 * dt);
+          av0 *= (1 - pSpinAir * dt);
+
+          const airFactor = clamp(y0 / 180, 0, 1);
+          vx0 += rng.s() * pVxNoise * airFactor * dt;
+          av0 += rng.s() * pTorqueNoise * (0.35 + 0.65 * airFactor) * dt;
+
+          a0 += av0 * dt;
+
+          if (y0 < 0) {
+            y0 = 0;
+            if (vy0 < 0) {
+              vy0 = -vy0 * pBounce;
+              vx0 *= pFloorFriction;
+              av0 *= pSpinFriction;
+              av0 += rng.s() * pKick;
+            }
+          }
+
+          const low = (y0 === 0 && Math.abs(vy0) < VY_STOP && Math.abs(av0) < AV_STOP);
+          calm = low ? (calm + 1) : 0;
+          if (calm > 18) break;
+        }
+
+        if (shouldStand(a0, rng)) return "edge";
+        return (Math.cos(a0) > 0) ? "heads" : "tails";
+      }
+
+      function runBatch(n) {
+        if (running || dragging || batching) return;
+
+        n = Math.max(1, Math.floor(Number(n || 1000)));
+        batching = true;
+
+        // chunking to keep UI responsive
+        const CHUNK = 500;
+        let done = 0;
+        let h0 = 0, t0 = 0, e0 = 0;
+
+        btnBatch.disabled = true;
+        btnToss.disabled = true;
+
+        clearStatExtra();
+        setPill(`批量中 0/${n}`);
+        resultText.textContent = `批量模拟中…`;
+
+        const baseSeed = csprngU32();
+        let idx = 0;
+
+        function step() {
+          if (!batching) {
+            setPill("待机");
+            btnBatch.disabled = false;
+            btnToss.disabled = false;
+            return;
+          }
+
+          const m = Math.min(CHUNK, n - done);
+          for (let i = 0; i < m; i++) {
+            const seed = mix32((baseSeed + Math.imul(idx + 1, 0x9E3779B9)) >>> 0);
+            idx++;
+
+            const r = simulateOnceSeed(seed);
+            if (r === "heads") h0++;
+            else if (r === "tails") t0++;
+            else e0++;
+          }
+          done += m;
+
+          setPill(`批量中 ${done}/${n}`);
+
+          if (done < n) {
+            requestAnimationFrame(step);
+            return;
+          }
+
+          // merge into cumulative stats
+          headsCount += h0;
+          tailsCount += t0;
+          edgeCount  += e0;
+          hCountEl.textContent = String(headsCount);
+          tCountEl.textContent = String(tailsCount);
+          eCountEl.textContent = String(edgeCount);
+
+          const nEff = h0 + t0;
+          const pHat = nEff > 0 ? (h0 / nEff) : 0.5;
+          const z = (nEff > 0) ? ((h0 - nEff / 2) / Math.sqrt(nEff / 4)) : 0;
+          const pval = (nEff > 0) ? twoSidedPFromZ(z) : 1;
+
+          resultText.textContent =
+            `批量 ${n} 次：正面 ${h0} / 反面 ${t0} / 立 ${e0}（正面占比 ${(pHat * 100).toFixed(2)}%）`;
+
+          statExtraEl.innerHTML =
+            ` ｜按(正/反)的有效样本 n=${nEff}：z=${z.toFixed(2)}，双侧 p≈${pval.toExponential(2)} （累计继续保留）`;
+
+          setPill("批量完成");
+
+          batching = false;
+          btnBatch.disabled = false;
+          btnToss.disabled = false;
+        }
+
+        requestAnimationFrame(step);
+      }
+
+      // ---------- pointer drag controls ----------
+      coin.addEventListener("pointerdown", (e) => {
+        if (running || batching) return;
+
+        dragging = true;
+        settled = false;
+        coin.setPointerCapture(e.pointerId);
+
+        const r = stage.getBoundingClientRect();
+        lastPX = e.clientX - r.left;
+        lastPY = e.clientY - r.top;
+        lastPT = performance.now();
+        vEstX = 0; vEstY = 0;
+
+        clearStatExtra();
+        setPill("蓄力中");
+      });
+
+      coin.addEventListener("pointermove", (e) => {
+        if (!dragging || running || batching) return;
+
+        const r = stage.getBoundingClientRect();
+        const px = e.clientX - r.left;
+        const py = e.clientY - r.top;
+        const pt = performance.now();
+
+        const dt = Math.max(1, pt - lastPT);
+        const vx0 = (px - lastPX) / dt; // px/ms
+        const vy0 = (py - lastPY) / dt;
+
+        // smooth release velocity estimate
+        vEstX = lerp(vEstX, vx0, 0.35);
+        vEstY = lerp(vEstY, vy0, 0.35);
+
+        // visual follow
+        coinX = clamp(coinX + (px - lastPX) * 0.18, -160, 160);
+
+        // "pre-rotation" while charging: both vertical flick and horizontal twist contribute
+        angle += (-vy0) * 0.018 + (vx0) * 0.012;
+
+        lastPX = px; lastPY = py; lastPT = pt;
+        render();
+      });
+
+      coin.addEventListener("pointerup", (e) => {
+        if (!dragging || running || batching) return;
+        dragging = false;
+
+        // Convert px/ms -> px/s
+        const relVx = vEstX * 1000;
+        const relVy = vEstY * 1000;
+
+        // pointer vy is down-positive; we want upward-positive
+        const initVy = clamp(-relVy * 1.25, 900, 2400);
+        const initVx = clamp(relVx * 0.55, -900, 900);
+
+        // spin direction: correlate with horizontal component; fallback to tiny randomness if near 0
+        let sign = Math.sign(relVx);
+        if (sign === 0) sign = (csprngU32() & 1) ? 1 : -1;
+
+        const speed = Math.hypot(relVx, relVy);
+        const initAvMag = clamp(speed * 0.020 + Math.abs(relVx) * 0.010, 18, 70);
+        const initAv = initAvMag * sign;
+
+        // keep the current "charged" orientation as starting orientation (more physical),
+        // then inject only micro-perturbation in startSim.
+        const initAngle = angle;
+
+        // seed uses crypto + gesture hash so the "same gesture" still doesn't repeat in fallback mode
+        const hint = ((relVx | 0) ^ ((relVy | 0) << 16) ^ ((angle * 1e6) | 0)) >>> 0;
+        const seed = csprngU32() ^ mix32(hint);
+
+        startSim({ initVy, initVx, initAv, initAngle, seed });
+      });
+
+      coin.addEventListener("pointercancel", () => {
+        dragging = false;
+        if (!running) {
+          setPill("待机");
+          render();
+        }
+      });
+
+      // ---------- buttons / hotkeys ----------
+      btnBatch.addEventListener("click", () => runBatch(batchN.value));
+      btnToss.addEventListener("click", tossAuto);
+      btnReset.addEventListener("click", reset);
+      btnClear.addEventListener("click", clearCounts);
+
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space") {
+          e.preventDefault();
+          tossAuto();
+        }
+        if (e.key.toLowerCase() === "r") reset();
+        if (e.key.toLowerCase() === "c") clearCounts();
+      });
+
+      // init
+      reset();
+    })();
+
+  </script>
+</body>
+</html>
