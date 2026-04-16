@@ -29,7 +29,8 @@
       background: radial-gradient(1200px 700px at 50% 20%, #19223a 0%, var(--bg) 55%, #070a10 100%);
       user-select: none;
       -webkit-user-select: none;
-      touch-action: none;
+      touch-action: pan-y;
+      overflow-x: hidden;
     }
     .wrap {
       min-height: 100%;
@@ -340,18 +341,98 @@
       color: var(--muted);
       line-height: 1.65;
     }
+    .resultOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(6, 10, 18, .82);
+      backdrop-filter: blur(10px);
+      z-index: 999;
+    }
+    .resultOverlay.show {
+      display: flex;
+    }
+    .resultModal {
+      width: min(560px, 100%);
+      max-height: min(88vh, 900px);
+      overflow: auto;
+      background: rgba(18, 24, 40, .92);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 24px;
+      box-shadow: 0 24px 70px rgba(0,0,0,.42);
+      padding: 18px;
+    }
+    .resultModalTitle {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .resultModalSub {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .resultModal .guaWrap {
+      grid-template-columns: 1fr 1fr;
+      margin-bottom: 14px;
+    }
+    .resultModalActions {
+      display: grid;
+      gap: 10px;
+    }
+    .resultModalActions button {
+      width: 100%;
+      min-height: 46px;
+    }
     @media (max-width: 980px) {
-      .app { grid-template-columns: 1fr; }
-      .left { min-height: auto; }
-      .physicsArea { min-height: 520px; }
+      .app {
+        grid-template-columns: 1fr;
+      }
+      .left {
+        min-height: auto;
+      }
+      .physicsArea {
+        min-height: 520px;
+      }
     }
     @media (max-width: 640px) {
-      .topbar { flex-direction: column; }
-      .coinWrap { width: 92px; height: 92px; }
-      .shadow { width: 84px; }
-      .face { font-size: 24px; }
-      .physicsArea { min-height: 460px; }
+      .wrap {
+        display: block;
+        padding: 12px;
+      }
+      .app {
+        width: 100%;
+        gap: 12px;
+      }
+      .topbar {
+        flex-direction: column;
+      }
+      .coinWrap {
+        width: 92px;
+        height: 92px;
+      }
+      .shadow {
+        width: 84px;
+      }
+      .face {
+        font-size: 24px;
+      }
+      .physicsArea {
+        min-height: 460px;
+      }
+      .resultModal {
+        padding: 16px;
+        border-radius: 20px;
+      }
+      .resultModal .guaWrap {
+        grid-template-columns: 1fr;
+      }
     }
+
   </style>
 </head>
 <body>
@@ -447,7 +528,26 @@
     </div>
   </div>
 
-  
+  <div class="resultOverlay" id="resultOverlay" aria-hidden="true">
+    <div class="resultModal panel">
+      <div class="resultModalTitle">六爻已成</div>
+      <div class="resultModalSub">这里直接看卦象。下面点重来，就能重新起卦。</div>
+      <div class="guaWrap">
+        <div class="guaBox">
+          <div class="guaName">本卦</div>
+          <div class="lines" id="finalMainHex"></div>
+        </div>
+        <div class="guaBox">
+          <div class="guaName">变卦</div>
+          <div class="lines" id="finalChangedHex"></div>
+        </div>
+      </div>
+      <div class="resultModalActions">
+        <button id="btnRestartFromOverlay">重来</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     (() => {
       const stage = document.getElementById("stageArea");
@@ -458,9 +558,13 @@
       const historyList = document.getElementById("historyList");
       const mainHex = document.getElementById("mainHex");
       const changedHex = document.getElementById("changedHex");
+      const resultOverlay = document.getElementById("resultOverlay");
+      const finalMainHex = document.getElementById("finalMainHex");
+      const finalChangedHex = document.getElementById("finalChangedHex");
 
       const btnClear = document.getElementById("btnClear");
       const btnCenter = document.getElementById("btnCenter");
+      const btnRestartFromOverlay = document.getElementById("btnRestartFromOverlay");
 
       const laneOffsets = [-110, 0, 110];
       const laneNames = ["第一枚", "第二枚", "第三枚"];
@@ -805,6 +909,30 @@
         `;
       }
 
+      function showResultOverlay() {
+        resultOverlay.classList.add('show');
+        resultOverlay.setAttribute('aria-hidden', 'false');
+      }
+
+      function hideResultOverlay() {
+        resultOverlay.classList.remove('show');
+        resultOverlay.setAttribute('aria-hidden', 'true');
+      }
+
+      function renderFinalHexagrams() {
+        if (!tossHistory.length) {
+          finalMainHex.innerHTML = '<div class="empty">还没有记录。</div>';
+          finalChangedHex.innerHTML = '<div class="empty">还没有记录。</div>';
+          return;
+        }
+        const linesBottomUp = tossHistory.map(item => item.info);
+        const mainTopDown = [...linesBottomUp].reverse();
+        const changedTopDown = [...linesBottomUp].map(changedTypeOf).reverse();
+
+        finalMainHex.innerHTML = mainTopDown.map(item => yaoHtml(item.type, item.mark)).join('');
+        finalChangedHex.innerHTML = changedTopDown.map(type => yaoHtml(type)).join('');
+      }
+
       function renderHexagrams() {
         if (!tossHistory.length) {
           mainHex.innerHTML = '<div class="empty">还没有记录。</div>';
@@ -875,6 +1003,8 @@
         if (tossHistory.length >= 6) {
           setState('已满六爻');
           resultText.textContent += '，六爻已记录完成';
+          renderFinalHexagrams();
+          showResultOverlay();
         } else {
           setState('已记录');
         }
@@ -1016,6 +1146,7 @@
 
       function clearAll() {
         if (groupRunning || preTossAnimating) return;
+        hideResultOverlay();
         holdCollapsed = false;
         collapseTargetIndex = 1;
         tossHistory.length = 0;
@@ -1186,6 +1317,7 @@
 
       btnClear.addEventListener('click', clearAll);
       btnCenter.addEventListener('click', centerCoins);
+      btnRestartFromOverlay.addEventListener('click', clearAll);
 
       window.addEventListener('resize', () => {
         updateBoundsAndClamp();
